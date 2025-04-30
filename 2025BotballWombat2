@@ -1,95 +1,770 @@
 #include <kipr/wombat.h>
+#include <stdlib.h>
 
-/* TO DO: PICK UP PINK/GREEN IN ALL POSITIONS
-MAKE THE PART THAT GOES UP TO CUPS AND TURNS
-DETECT POLE COLOR AND PICK UP APPROPRIATE CUPS*/
+//0 is red 1 is green 2 is blue
+typedef struct{
+    int color;
+    int Xpos;
+    int width;
+}cup;
+int compareCups(const void* a, const void* b);
+int detectCups(cup cups[],int rightBound);
 
-int main()
-{
-    // Default values
-    camera_open();
-    camera_update();
+int detectCups(cup cups[],int rightBound){
+    //set up cup array
+    for(int i=0;i<3;i++){
+        cups[i].color=i;
+        cups[i].Xpos=0;
+        cups[i].width=0;  
+    }
+    int repeatNumber=3;//how many time to redo the detection to increase accuracy
+    for(int k=0;k<repeatNumber;k++){
+        camera_update();
+        msleep(50);
+        camera_update();
+        printf("total obj = %d\n",get_object_count(0));
+        //repeat loop
+        for(int j=0;j<3;j++){
+            int colorCount=get_object_count(j);
+            int xTotal=0;
+            int count=0;
+            //look for each of the 3 colors
+            for(int i=0;i<colorCount;i++){
+                if(j==0){
+                    printf("Object x for blue %d | %d \n",get_object_center_x(j,i),get_object_area(j,i));
+                }
+                //conditions for obeject to be counted
+                if(get_object_confidence(j,i)>0.01 && get_object_area(j,i)>12 && get_object_center_x(j,i)>10 && get_object_center_x(j,i)<rightBound && get_object_center_y(j,i)<220){
+                    xTotal+=get_object_center_x(j,i);
+                    count++;
+                }
+
+            }  
+            //set variables in cup
+            int centerX= xTotal/(count);
+            cups[j].color=j;
+            cups[j].Xpos+=centerX;
+        }
+    }
+    //find the mean of the values
+    for(int i=0;i<3;i++){
+        cups[i].Xpos=cups[i].Xpos/repeatNumber;
+    }
+    return 1;
+}
+
+int compareCups(const void* a, const void* b){
+    cup* cupA = (cup*)a;
+    cup* cupB = (cup*)b;
+    return cupA->Xpos - cupB->Xpos;
+}
+
+int lowerTime(int time){//time in ms
+    int t=0;
+    while(digital(1)!=1 && t<time){
+        mav(0,-1300);
+        msleep(50);
+        t+=50;
+    }
+    mav(0,0);
+    msleep(50);
+    return 0;
+}
+
+int raiseTime(int time){//time in ms
+    int t=0;
+    while(digital(0)!=1 && t<time){
+        mav(0,1300);
+        msleep(50);
+        t+=50;
+    }
+    mav(0,0);
+    msleep(50);
+    return 0;
+}
+
+int lower(){
+    int t=0;
+    while(digital(1)!=1 &&t<8300){
+        mav(0,-1300);
+        msleep(50);
+        t+=50;
+    }
+    mav(0,0);
+    msleep(50);
+    return 0;
+}
+
+int raise(){
+    while(digital(0)!=1){
+        mav(0,1300);
+        msleep(50);
+    }
+    mav(0,0);
+    msleep(50);
+    return 0;
+}
+
+int main() {
+    /*GO FORWARD UNTIL DETERMINING PINK/GREEN
+	BACK UP, ROTATE BACKWARDS, AND MOVE BACKWARDS UNTIL FINDING RESPECTIVE CUP
+	PICK UP CUP*/
     enable_servos();
-    
+    camera_open();
+    set_servo_position(0,1600);
+    camera_update();
+
+    // Raise claw
+    raise();
+
+    //wait_for_light();
+    set_servo_position(0,1000);
+
+
+    int time=5;
+    mav(2, 1100);
+    mav(3,1100);
+    while(analog(0)<3600)
+    {
+        if(analog(2) > 2800)
+        {
+            mav(2, 1050);
+            mav(3,1100);
+            printf("too much to left \n");
+        }
+        if(analog(2) < 2680)
+        {
+            mav(2, 1100);
+            mav(3,1050);
+            printf("too much to right \n");
+        }
+        time+=25;
+        msleep(time);
+    }
+    msleep(200);
+    time=50;
+    //move back slighly to give camera larger fov
+    mav(2,-400);
+    mav(3,-400);
+    msleep(800);
+    mav(2,0);
+    mav(3,0);
+
+    //raise();//double check if it is raised
+
     // Default motor position
     clear_motor_position_counter(0);
 
-    //Check if objects exist in frame
-    if(get_object_count(0) > 0)
-    {
-        //Check if cup in question is on left
-        if(get_object_center_x(0,0) < 388)
-        {
-    
-             // Rotate until object is straight ahead
-            while(get_object_center_x(0,0) < 388)
-            {
-                motor(2, 10);
-                motor(3, 10);
-                printf("Green Cup Position: %d\n", get_object_center_x(0,0));
-                camera_update();
-            }
-            //Move to cup
-            while(analog(1) <=1700)
-            {
-                motor(2, 75);
-                motor(3, -75);
-            }
-            freeze(2);
-            freeze(3);
-            set_servo_position(0,600);
-            //Lower cup
-  			while(gmpc(0) > -1350)
-            {
-                motor(0, -100);
-            }
-            while(analog(1) <=2600)
-            {
-                motor(2,25);
-                motor(3, -25);
-            }
-            set_servo_position(0,1150);
-        //If object is on right of frame
-        }else if(get_object_center_x(0,0) > 388)
-        {
-            //Rotate until object is straight ahead
-            while(get_object_center_x(0,0) > 388)
-            {
-                motor(2, -10);
-                motor(3, -10);
-                printf("Green Cup Position: %d\n", get_object_center_x(0,0));
-                camera_update();
-            }
-            //Move forward
-            while(analog(1) <=1700)
-            {
-                motor(2,75);
-                motor(3, -75);
-            }
-            freeze(2);
-            freeze(3);
-            set_servo_position(0,800);
-            //Lower cup
-  			while(gmpc(0) > -1350)
-            {
-                motor(0, -100);
-            }
-            while(analog(1) <=2600)
-            {
-                motor(2,25);
-                motor(3, -25);
-            }
-            set_servo_position(0,1150);
-        }else if(300 <= get_object_center_x(0,0) && get_object_center_x(0,0) <=380)
-        {
-            printf("no hog riders allowed");
-        }
-            
-        
-        
-        
+    set_servo_position(0,1300);//open enough for the cup
+    set_servo_position(1,0);//camera start
+
+    cup cups[3];//not including the pole
+    cup cups2[3];//with pole
+    msleep(1000);
+    detectCups(cups,425);//not including the pole
+    detectCups(cups2,640);//with pole
+
+    //distance changed
+    int change[3];
+    for(int i=0;i<3;i++){
+        change[i]=cups[i].Xpos-cups2[i].Xpos;
+        printf("%d\n",change[i]);
     }
-    
-    
+
+    int maxAbsValue=abs(change[0]);
+    int maxAbsIndex=0;
+    //find max distance changed
+    for(int i=1;i<3;i++){
+        if(abs(change[i])>maxAbsValue && cups[i].color!=2){
+            maxAbsValue = abs(change[i]);
+            maxAbsIndex=i;
+        }
+    }
+    int ColorChange=0;
+    printf("ColorChange= %d\n",ColorChange);
+    qsort(cups2,3,sizeof(cup),compareCups);
+    qsort(cups,3,sizeof(cup),compareCups);
+    printf("cups post sort \n");
+    for(int i=0;i<3;i++){
+        printf("color %d\n",cups[i].color);
+        printf("Xpos %d\n",cups[i].Xpos);
+    }
+    printf("cups2 post sort \n");
+    for(int i=0;i<3;i++){
+        printf("color %d\n",cups2[i].color);
+        printf("Xpos %d\n",cups2[i].Xpos);
+    }
+    printf("done Camera");
+
+    lowerTime(4700);
+    int color =1;
+
+    if(color==1/*cups[1].color==ColorChange*/){// color==1){
+        set_servo_position(0,1166);//open to cup width
+        printf("MIDDLE CUP");
+
+        //rotate to middle cup
+        mav(2, 100);
+        mav(3,-100);
+        msleep(2800);
+
+        int time=0;
+        while(analog(1) < 2350 && time<4500)//set a max time incase it misses the cup
+        {
+            if(analog(2) >1900){ //too close to the pipe
+                mav(3, 890);
+                mav(2,850);
+                printf("too close to left \n");
+            }else if(analog(2) <1800){ // too far from the pipe
+                mav(3,850);
+                mav(2,925);
+                printf("too close to right \n");
+            }else{ // perfect in the middle 
+                mav(2, 850);
+                mav(3, 850);
+            }
+            time+=50;
+            msleep(49);
+        }
+        //stop
+        mav(2,0);
+        mav(3,0);
+
+        //grab cup
+        set_servo_position(0,1525);
+        msleep(1250);
+
+        //back up 
+        mav(2, -1200);
+        mav(3,-1000);
+        msleep(1450);
+
+        //stop & raise
+        mav(2,0);
+        mav(3,0);
+        raiseTime(2000);
+
+        //turn
+        mav(2,-400);
+        mav(3,900);
+        msleep(4000);
+
+        //move forward right a little to the green dot
+        /*mav(2, 200);
+        mav(3, 300);
+        msleep(1300);
+        mav(2,0);
+        mav(3,0);*/
+    }
+    if(color==0/*cups[0].color==ColorChange*/){// color==0){
+        set_servo_position(0,1200);//open to cup width
+        printf("LEFT CUP");
+        int time =0;
+
+        mav(2, 700);
+        mav(3, -700);
+        msleep(1350);
+
+        while(analog(1) < 2400 && time<4700)
+        {
+            mav(2,1350);
+            mav(3, 1300);
+            time+=50;
+            msleep(49);
+        }
+
+        //stop
+        mav(2,0);
+        mav(3,0);
+
+        //grab cup
+        set_servo_position(0,1500);
+        msleep(1250);
+
+        //back up 
+        mav(2, -1000);
+        mav(3,-1000);
+        msleep(1450);
+
+        //Stop and raise
+        mav(2,0);
+        mav(3,0);
+        raiseTime(2000);
+
+        //turn
+        mav(2,-400);
+        mav(3,900);
+        msleep(4400);
+
+        //move forward
+        /*mav(2, 200);
+        mav(3, 200);
+        msleep(150);
+        mav(2,0);
+        mav(3,0);*/
+
+
+    }
+    if(color ==2/*cups[2].color==ColorChange*/){// color ==2){
+        set_servo_position(0,1200);//open to cup width
+        printf("RIGHT CUP \n");
+        int time = 0;
+
+        mav(2, 1300);
+        mav(3, 1300);
+        msleep(1500);
+        while(analog(1) < 1750 && time<=2000)
+        {
+            while(analog(2) > 2550)
+            {
+                mav(2, 1000);
+                mav(3,1200);
+                printf("too much to left \n");
+            }
+            while(analog(2) < 1900)
+            {
+                mav(2, 1200);
+                mav(3,1000);
+                printf("too much to right \n");
+            }
+            time+=25;
+            msleep(time/2);
+        }
+        if(time > 2825)
+        {
+            printf("time stopped \n");
+        }else if(analog(1) >= 1650)
+        {
+            printf("analog stopped \n");
+        }
+
+        //stop
+        mav(2,0);
+        mav(3,0);
+
+        //grab cup
+        set_servo_position(0,1500);
+        msleep(1250);
+
+        //back up to not hit ceiling
+        mav(2, -1000);
+        mav(3,-1000);
+        msleep(1500);
+
+        //stop & raise
+        mav(2,0);
+        mav(3,0);
+        raiseTime(3500);
+        
+        mav(2, -1000);
+        mav(3,-1000);
+        msleep(200);
+        
+        //Move back again for alignment
+        /*int t = 0;
+        while(analog(1) > 1000 && t <300)
+        {
+            mav(2, -1000);
+        	mav(3,-1000);
+            t+=50;
+            msleep(t);
+        }
+        if(analog(1) < 1000)
+        {
+            printf("SENSOR TIMED OUT \n");
+        }else
+        {
+           printf("TIMED OUT \n"); 
+        }*/
+
+        //turn
+        mav(2,-400);
+        mav(3,900);
+        msleep(4000);
+
+        //move forward a little
+        mav(2, 200);
+        mav(3, 200);
+        msleep(100);
+        mav(2,0);
+        mav(3,0);
+    }
+    int t=0;
+
+    //After the 3 cases
+    // move back to reset strightness (will crash but that is on purpose)
+    mav(2, -900);
+    mav(3, -900);
+    msleep(3000);
+
+    while(analog(0)<3500)
+    {
+        printf("move forward to spot");
+        mav(2, 1300);
+        mav(3,1300);
+    }
+
+    printf("move left here 1");
+    while(analog(0)>3400)
+    {
+        printf("move forward to spot part 2");
+        mav(2, 1300);
+        mav(3,1300);
+    }
+    msleep(75);
+    printf("move left here 2");
+    mav(2,0);
+    mav(3,0);
+
+    // drop the cup
+    printf("drop the cup");
+    lowerTime(1900);
+    set_servo_position(0,970);
+    msleep(1000);
+    raise();
+
+    //back up
+    printf("back up");
+    mav(2, -1000);
+    mav(3,-1000);
+    msleep(1800);
+    mav(2,0);
+    mav(3,0);
+
+    printf("lift up");
+    raise();//lift up
+
+    set_servo_position(0,1400);
+
+    while(analog(0)<3500)
+    {
+        printf("move forward to spot");
+        mav(2, 1350);
+        mav(3,1350);
+    }
+
+    printf("move left here 1");
+    while(analog(0)>3400)
+    {
+        printf("move forward to spot part 2");
+        mav(2, 1200);
+        mav(3,1200);
+    }
+    msleep(200);
+
+    //turn left
+    printf("turn left");
+    t=0;
+    mav(2, 1300);
+    mav(3,-700);
+    msleep(500);
+    while((t<2200 && analog(1)>1100) || t<1075){
+        mav(2, 1300);
+        mav(3,-700);
+        t+=50;
+        msleep(49);
+    }
+
+
+    //move forward to ice 
+    while(analog(1) < 2400)
+    {
+        mav(2, 1300);
+        mav(3, 1300);
+        printf("moving until cup \n");
+    }
+    msleep(100);
+    printf("no longer moving until cup \n");
+
+    //turn right
+    t=0;
+    mav(2, -1200);
+    mav(3,1200);
+    msleep(800);
+    while(t<500 && analog(1)<2900){
+        mav(2, -1300);
+        mav(3,1300);
+        t+=50;
+        msleep(49);
+    }
+
+    //move forward to ice 
+    while(analog(1) < 2800)//this moves forward till it is to close to the sensor
+    {
+        mav(2, 500);
+        mav(3, 500);
+    }
+
+    //move the rest of the way and turn slighly to strighten
+    mav(2, 400);
+    mav(3,600);
+    msleep(1700);
+    mav(2, -500);
+    mav(3, -500);
+    msleep(100);
+    mav(2, 0);
+    mav(3,0);
+    //open sesame
+    set_servo_position(0,1000);
+    //lower 
+    lower();
+    //grab
+    set_servo_position(0,925);//done slowly so if its caught on the edge of a pipe it has time to drop
+    msleep(500);
+    set_servo_position(0,1200);
+    msleep(300);
+    set_servo_position(0,1400);
+    msleep(500);
+    set_servo_position(0,1500);
+    msleep(300);
+    set_servo_position(0,1630);
+    msleep(300);
+
+    //raise
+    raise();
+    //backwards slighly
+    mav(2, -1000);
+    mav(3, -1000);
+    msleep(250);
+
+    //turn right
+    mav(2, -1000);
+    mav(3,1000);
+    msleep(500);
+    while(analog(1) > 2500)
+    {
+        mav(2, -1000);
+        mav(3,1000);
+    }
+    msleep(300);
+    /*
+    mav(2, 0);
+    mav(3,0);
+    msleep(300);*/
+    //forward slighly
+    /*mav(2, 1000);
+    mav(3,1000);
+    msleep(300);
+    mav(2, 0);
+    mav(3,0);
+    msleep(500);*/
+    t=0;
+    /*while((analog(1)<2500 && t<1000) || t>300)
+    {
+        msleep(49);
+        mav(2, -1100);
+        mav(3,900);
+        t+=50;
+
+    }*/
+    while(analog(1) <1500)
+    {
+        mav(2, -1200);
+        mav(3, 1000);
+    }
+    mav(2,0);
+    mav(3,0);
+    msleep(700);
+    mav(2, 1100);//sensor is slighly off so this should comphensate 
+    /*mav(3,-900);
+    msleep(300);
+    mav(2, 0);
+    mav(3,0);*/
+    //move a bit more based on the sensor
+    while(analog(1)>2000)
+    {
+        mav(2, -1200);
+        mav(3,1000);
+    }
+    /*mav(2, 400);
+    mav(3,-350);
+    msleep(100);//left slighly more*/
+
+    //move forward to get closer to the cup  not directly needed but good to have incase
+    while(analog(1)<2600 && analog(1)>1200)
+    {
+        mav(2, 900);
+        mav(3,900);
+    }
+
+    //move forward slighly to cup to drop poms
+    /*mav(2, 500);
+    mav(3,500);
+    msleep(200);//not needed since it was move to a few lines up
+    mav(2,0);
+    mav(3,0);
+    mav(2, -500);
+    mav(3, -500);
+    msleep(50);*/
+    //stop and drop
+    mav(2, 0);
+    mav(3,0);
+    lowerTime(500);
+    set_servo_position(0,900);
+    msleep(600);
+    set_servo_position(0,1300);
+    msleep(400);
+    set_servo_position(0,1100);
+    msleep(100);
+    set_servo_position(0,950);
+    msleep(100);
+    set_servo_position(0,800);
+    //move backward slighly 
+    mav(2, -500); //CONSISTENSY TEST
+    mav(3,-500);
+    msleep(1000);
+    mav(2, 0);
+    mav(3,0);
+    //lower
+    lowerTime(4500);
+    //move forward
+    t=0;
+    while((t<1300 && analog(1)<2300 )|| (t<400))
+    {
+        mav(2, 650);
+        mav(3,650);
+        t+=49;
+        msleep(50);
+    }
+    mav(2, 0);
+    mav(3,0);
+    //grab cup
+    set_servo_position(0,1500);
+    mav(2, 0);
+    mav(3,0);
+    raise();
+    //move backward slighly 
+    mav(2, -500);
+    mav(3,-500);
+    msleep(250);
+    t=0;
+    //turn left(sensor)
+    while(analog(1)<2100 && t<2000)
+    {
+        mav(2, 900);
+        mav(3, -950);
+        t+=50;
+        msleep(49);
+    }
+    //back slighly so it wont hit pipe when turning
+    mav(2, -900);
+    mav(3, -900);
+    msleep(500);
+    t=0;
+    while(analog(1)<2100 &&t<500)
+    {
+        mav(2, 900);
+        mav(3, -950);
+        t+=20;
+        msleep(20);
+    }
+    //incase poms are on the ground
+    mav(2, 900);
+    mav(3, -950);
+    msleep(1000);
+    while(analog(1)>1600)//rotating left to release cup
+    {
+        mav(2, 1000);
+        mav(3, -1300);
+    }
+    msleep(20);
+    //forward slighly
+    mav(2, 700);
+    mav(3,700);
+    msleep(250);
+    mav(2, 0);
+    mav(3,0);
+    //move back in case its to close
+    while(analog(1)>1600)
+    {
+        mav(2, -700);
+        mav(3, -700);
+    }
+    mav(2, 0);
+    mav(3,0);
+    //lower cup
+    lowerTime(5000);
+    //drop cup 
+    set_servo_position(0,1200);
+    msleep(200);
+    set_servo_position(0,1000);
+    //backwards slighly
+    mav(2, -700);
+    mav(3,-700);
+    msleep(200);
+    mav(2, 0);
+    mav(3,0);
+    raise();
+
+
+    //loop for drinks 
+    for(int i=0;i<4;i++)
+    {
+        set_servo_position(0,1100);
+        //turn left
+        mav(2, 1100);
+        mav(3,-900);
+        msleep(1100);
+        mav(2, 0);
+        mav(3,0);
+        //close a bit to not hit cup 
+        set_servo_position(0,1500);
+        //lower to drink level
+        lower();
+        //a bit more incase
+        lowerTime(200);
+        set_servo_position(0,1200);
+        //forward
+        mav(2, 900);
+        mav(3, 900);
+        msleep(1400);
+        mav(2, 0);
+        mav(3,0);
+        //grab drink
+        set_servo_position(0,1700);
+        msleep(1000);
+        //reverse
+        mav(2, -900);
+        mav(3, -900);
+        msleep(1400);
+        mav(2, 0);
+        mav(3,0);
+        //raise
+
+        raise();
+        //turn right till it detects the cups
+        while(analog(1)<2000)
+        {
+            mav(2, -700);
+            mav(3, 700);
+        }
+        msleep(1000);//some more
+        mav(2, 0);
+        mav(3,0);
+        lowerTime(750);
+        //let go drink
+        set_servo_position(0,900);
+        msleep(200);
+        //backward
+        mav(2, -900);
+        mav(3, -900);
+        msleep(300);
+        //forward
+        mav(2, 900);
+        mav(3, 900);
+        msleep(300);
+        mav(2, 0);
+        mav(3,0);
+        lowerTime(4000);
+        //grab drink agian to reset the spot
+        set_servo_position(0,1400);
+        msleep(1000);
+        //let go drink
+        set_servo_position(0,900);
+        raise();
+        msleep(1100);
+
+    }
+
     return 0;
 }
