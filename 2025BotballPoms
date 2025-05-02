@@ -1,23 +1,43 @@
 #include <kipr/wombat.h>
-//Analog(0) = light detection
-//Analog(1) = color sensor
-//Analog(2) = distance sensor
+/*
+analog(LIGHT/0) = light detection
+analog(FTOPHAT/1) = front tophat sensor
+analog(DISTANCE/2) = distance sensor
+analog(BTOPHAT/3) = back tophat sensor
 
 
-//Motor(0) = right wheel
-//Motor(1) = left wheel
+motor(RWHEEL/0) = right wheel
+motor(LWHEEL/1) = left wheel
 
 
-//Servo(0) = Pulley
-//Servo(1) = claw
+servo(PULLEY/0) = Pulley
+servo(CLAW/1) = claw
+*/
+
+
 
 
 //Constants
-const int rVelo=1350; //General wheel velocities
-const int lVelo=1400;
-const int blackTape=3500;
-const int maxPulley=2047;
-const int closeClaw=0;
+const int RVELO=1200; //General wheel velocities
+const int LVELO=1200; //OG 1170
+const int BLACKTAPE=3500;
+const int MAXPULLEY=2047;
+const int PULLEYH=1500;
+const int CLOSECLAW=0;
+
+
+//Port numbers
+//Servos
+const int PULLEY=0;
+const int CLAW=1;
+//Motors
+const int RWHEEL=0;
+const int LWHEEL=1;
+//Analogs
+const int LIGHT=0;
+const int FTOPHAT=1;
+const int DISTANCE=2;
+const int BTOPHAT=3;
 
 
 //Variables
@@ -27,9 +47,14 @@ int passedTape=0;
 
 //Declarations
 void starting();
-void pomSteps(int turnTime1,int turnTimeRight, int forwardTime, int forwardTime2, int turnTime2, int clawAmount);
-void pomStepsRand(int reverseTime, int forwardTime, int forwardTime2, int turnTime1);
+void forward(int forwardTime);
+void forwardSensor(int distance);
 void reverse(int reverseTime);
+void turning(int time, int direction);
+void turningSensor(int delayTime, int direction);
+void setClaw(int amount);
+void setPulley(int amount);
+void gradClaw(int amount);
 
 
 
@@ -37,265 +62,410 @@ void reverse(int reverseTime);
 int main()
 {
     enable_servos();
-    set_servo_position(1,100);
-    set_servo_position(0,2047);
-    msleep(1000);
+    setClaw(10);
+    setPulley(1950);
     //wait_for_light(0);
-    shut_down_in(120);
+    /*int canStart=0;
+    while(canStart==0)
+    {
+        if(analog(LIGHT)<=200)
+        {
+            msleep(1);
+            canStart=1;
+            printf("Starting\n");
+        }//Detects light
+    }//End of light detection*/
+    shut_down_in(115);
     printf("Activated\n");
-   
+
+
+    //Starting/Set 1
     starting();
-    pomSteps(0,0,2400,1500,2150,800); //The first one is zero, second needs to be found, third needs to be found, fourth is zero
-    reverse(750);
-    pomSteps(750,0,750,0,2200,550);
-    pomSteps(0,200,3000,1750,2100,800);
+    setClaw(575);
+    setPulley(0);
+    mav(RWHEEL,1200-140);
+    mav(LWHEEL,1200);
+    msleep(1000);
+    mav(RWHEEL,1200+27.5);
+    mav(LWHEEL,1200);
+    msleep(3000);
+    freeze(0);
+    freeze(1);
+    //forward(4250);
+    gradClaw(5);
+    setClaw(200);
+    forward(200);
+    setClaw(0);
+    setPulley(PULLEYH);
+    forward(665);
+    turning(2250,0);
+    forwardSensor(1900);
+    forward(950);
+    reverse(200);
+    turning(150,0);
+    gradClaw(150);
+    msleep(250);
+    printf("Drop 1\t");
+    forward(100);
+    gradClaw(1000);
+    setPulley(MAXPULLEY);
+    setClaw(200);
+    printf("\n");
    
-    /*pomStepsRand(3000,3500,1000,1750);
-    pomStepsRand(2000,3500,0,1750);*/
-
-
-}//Main
+   
+    //Set 2
+    reverse(1000);
+    setClaw(500);
+    turningSensor(700,1);
+    reverse(350);
+    setPulley(150);
+    msleep(500);
+    forward(300);
+    turning(600,1);
+    forward(300);
+    turning(250,1);
+    forward(525);
+    turning(100,0);
+    forward(150);
+    turning(100,0);
+    gradClaw(5);
+    setClaw(200);
+    forward(580);
+    turning(125,0);
+    setClaw(5);
+    setPulley(PULLEYH);
+    reverse(1000);
+    turning(2500,0);
+    forwardSensor(1900);
+    forward(1000);
+    turning(400,0);
+    reverse(700);
+    turning(75,1);
+    forward(175);
+    gradClaw(175);
+    msleep(250);
+    printf("Drop 1\t");
+    forward(500);
+    //turning(75,1);
+    gradClaw(1000);
+    setPulley(MAXPULLEY);
+    setClaw(200);
+    printf("\n");
+   
+    //Set 3
+    turning(500,1);
+    reverse(1150);
+    turningSensor(300,1);
+    setClaw(600);
+    setPulley(175);
+    forward(2750);
+    gradClaw(300);
+    forward(500);
+    gradClaw(5);
+    setClaw(200);
+    forward(350);
+    setClaw(0);
+    setPulley(PULLEYH);
+    forward(600);
+    turning(2250,0);
+    forwardSensor(1900);
+    forward(1000);
+    reverse(350);
+    turning(175,0);
+    gradClaw(200);
+    msleep(250);
+    printf("Drop 1\t");
+    forward(425);
+    gradClaw(1000);
+    setPulley(MAXPULLEY);
+    setClaw(200);
+    printf("\n");
+   
+   
+    //Set 1 Random
+    reverse(1250);
+    turningSensor(1000,0);
+    mav(0,-1350);
+    mav(1,-1350);
+    msleep(4250);
+    freeze(0);
+    freeze(1);
+    forward(1250);
+    turning(275,0);
+    setClaw(800);
+    setPulley(75);
+    //forward(500);
+    msleep(350);
+    forward(1225);
+    turning(800,1);
+    turning(175,0);
+    reverse(250);
+    forward(1600);
+    gradClaw(5);
+    setClaw(750);
+    reverse(100);
+    setPulley(175);
+    forward(1250);
+    gradClaw(5);
+    setClaw(750);
+    reverse(100);
+    forward(1150);
+    gradClaw(200);
+    setClaw(0);
+    setPulley(PULLEYH);
+    reverse(1400);
+    turning(2325,1);
+    forwardSensor(1900);
+    forward(625);
+    reverse(250);
+    turning(100,0);
+    gradClaw(200);
+    msleep(250);
+    printf("Drop 1\t");
+    forward(675);
+    gradClaw(1000);
+    setPulley(MAXPULLEY);
+    setClaw(200);
+    printf("\n");
+   
+    //Set 2 Random
+    reverse(1500);
+    turningSensor(0,0);
+    turning(950,0);
+    setClaw(800);
+    setPulley(200);
+    msleep(400);
+    turning(925,1);
+    forward(1950);
+    gradClaw(5);
+    setClaw(750);
+    forward(500);
+    reverse(100);
+    turning(200,1);
+    forward(1250);
+    gradClaw(5);
+    reverse(100);
+    setClaw(700);
+    forward(1750);
+    gradClaw(200);
+    setClaw(0);
+    setPulley(PULLEYH);
+    reverse(4650);
+    turning(2375,1);
+    forwardSensor(1900);
+    forward(425);
+    turning(175,0);
+    gradClaw(150);
+    forward(375);
+    gradClaw(1000);
+    setPulley(MAXPULLEY);
+    setClaw(200);
+    printf("\n");
+   
+}//main
 
 
 //Gets the bot lined up to the middle tape
 void starting()
 {
-    //The following loop moves the robot forward until it detects the "middle" black tape in the kitchen
-    mav(0,rVelo/2);
-    mav(1,lVelo/2);
-    msleep(500);
-    mav(1,lVelo);
-    mav(0,-100);
-    msleep(2550);
-    freeze(0);
-    freeze(1);
-    msleep(1000);
-    while(analog(1)<=blackTape&&passedTape==0)
+    //The following code turns the robot
+    msleep(7000);
+    setPulley(MAXPULLEY);
+    mav(RWHEEL,700);
+    mav(LWHEEL,675);
+    msleep(1150);
+    mav(LWHEEL,1400);
+    mav(RWHEEL,-100);
+    msleep(2500);
+    freeze(RWHEEL);
+    freeze(LWHEEL);
+    printf("Done starting\t");
+    mav(RWHEEL,1200);
+    mav(LWHEEL,1200);
+    while(passedTape==0)
     {
-       
-        mav(0,rVelo/2);
-        mav(1,lVelo/2);
-        if(analog(1)>blackTape) //This detects the tape
+        if(analog(FTOPHAT)>BLACKTAPE) //This detects the tape
         {
-           
-            msleep(500);
+            msleep(450);
             passedTape=1;
-            freeze(0);
-            freeze(1);
+            freeze(RWHEEL);
+            freeze(LWHEEL);
             printf("Detected tape\n");
-           
         }
+        msleep(5);
     }//While loop for detecting tape
    
     //Turns onto the tape
-    set_servo_position(1,400);
-    set_servo_position(0,800);
-    mav(0,-rVelo/2);
-    mav(1,lVelo);
+    if(passedTape==1)
+    {
+        turningSensor(600,0);
+        mav(0,-150);
+        mav(1,-1500);
+        msleep(1500);
+        mav(0,-1500);
+        mav(1,-150);
+        msleep(1500);
+        freeze(0);
+        freeze(1);
+    }
+}//starting
+
+
+//A method for going forward for a certain amount of time
+void forward(int forwardTime)
+{
+    mav(RWHEEL,RVELO);
+    mav(LWHEEL,LVELO);
+    msleep(forwardTime);
+    freeze(RWHEEL);
+    freeze(LWHEEL);
+    printf("Foward done\t");
    
-    msleep(2800);
-    freeze(0);
-    freeze(1);
-} //Starting
+}//forward
 
 
-//A general method to get poms
-void pomSteps(int turnTime1, int turnTimeRight, int forwardTime,int forwardTime2, int turnTime2, int clawAmount)
+//Uses the distance sensor to determine how far forward to move
+void forwardSensor(int distance)
 {
     atPVC=0;
-    //The following turns the robot out for the first time
-    mav(0,rVelo);
-    mav(1,-lVelo);
-    msleep(turnTime1);
-    freeze(0);
-    freeze(1);
-    printf("Done 1st turning\t");
-   
-    mav(0,-rVelo);
-    mav(1,lVelo);
-    msleep(turnTimeRight);
-    freeze(0);
-    freeze(1);
-    printf("Done turning Right\t");
-
-
-    //Moves forward until it reaches poms
-    set_servo_position(1,clawAmount);
-    msleep(1000);
-    set_servo_position(0,0);
-    msleep(1000);
-    mav(0,rVelo);
-    mav(1,lVelo);
-    msleep(forwardTime);
-    set_servo_position(1,550);
-    freeze(0);
-    freeze(1);
-    printf("Forward done\t");
-   
-    //Turns until it faces the tray
-    set_servo_position(1,closeClaw);
-    msleep(1000);
-    set_servo_position(0,maxPulley/2+200);
-    msleep(750);
-    mav(0,rVelo);
-    mav(1,lVelo);
-    msleep(forwardTime2);
-    freeze(0);
-    freeze(1);
-    msleep(750);
-    mav(0,-rVelo);
-    mav(1,lVelo);
-    msleep(turnTime2);
-    freeze(0);
-    freeze(1);
-    set_servo_position(0,1500); //A little bit higher than maxPulley/2
-    printf("Done 2nd turning\t");
-   
-    //Moves forward until it is within range of PVC near tray
-    while(analog(2)<=1900&&atPVC==0)
+    mav(RWHEEL,RVELO/2+300);
+    mav(LWHEEL,LVELO/2+300);
+    while(atPVC==0)
     {
-        mav(0,rVelo/2+300);
-        mav(1,lVelo/2+300);
-        if(analog(2)>1900)
+        if(analog(DISTANCE)>distance)
         {
-            freeze(0);
-            freeze(1);
+            freeze(RWHEEL);
+            freeze(LWHEEL);
             atPVC=1;
             printf("At PVC\t");
         }//Detects PVC
+        msleep(5);
     }//While loop for PVC
-   
-    mav(0,rVelo/2+300);
-    mav(1,lVelo/2+300);
-    msleep(1250);
-    freeze(0);
-    freeze(1);
-   
-    //Drops poms
-    msleep(1000);
-    set_servo_position(0,maxPulley/2+200);
-    set_servo_position(1,100);
-    msleep(500);
-    set_servo_position(1,200);
-    msleep(500);
-    set_servo_position(1,700);
-    msleep(1000);
-    printf("Poms dropped\t");
-   
-    //Resets the bot's position such that it faces the "right" side of the board
-    mav(0,-rVelo);
-    mav(1,-lVelo);
-    msleep(1000);
-    mav(0,rVelo);
-    mav(1,-lVelo);
-    msleep(turnTime2-250); //The value seems to change depending on battery
-    freeze(0);
-    freeze(1);
-    msleep(1000);
-    printf("Reseted ordered\n");
-} //Pomstep
+}//forwardSensor
 
 
-void pomStepsRand(int reverseTime, int forwardTime, int forwardTime2, int turnTime1)
-{
-    //Reverses the bot to get the set and sets the claw to a specific amount
-    mav(0,-rVelo);
-    mav(1,-lVelo);
-    set_servo_position(1,400);
-    msleep(reverseTime);
-    freeze(0);
-    freeze(1);
-    set_servo_position(0,0);
-    msleep(1000);
-    printf("Reverse done\t");
-
-
-    //Drives forward until half the amount of poms is received
-    mav(0,rVelo);
-    mav(1,lVelo);
-    msleep(forwardTime/2);
-    freeze(0);
-    freeze(1);
-    set_servo_position(1,300);
-    msleep(750);
-    set_servo_position(1,150);
-    msleep(750);
-    set_servo_position(1,400);
-    printf("First half done\t");
-
-
-    //Drives forward until next half the amount of poms is received
-    mav(0,rVelo);
-    mav(1,lVelo);
-    msleep(forwardTime/2);
-    freeze(0);
-    freeze(1);
-    set_servo_position(1,300);
-    msleep(750);
-    set_servo_position(1,150);
-    msleep(750);
-    set_servo_position(1,0);
-    set_servo_position(0,maxPulley/2+200);
-    msleep(1000);
-    set_servo_position(0,maxPulley);
-    printf("Second half done\t");
-
-
-    //Goes forward, turns and drops the poms
-    mav(0,rVelo);
-    mav(1,lVelo);
-    msleep(forwardTime2);
-
-
-    mav(0,-rVelo);
-    mav(1,lVelo);
-    msleep(turnTime1);
-    mav(0,rVelo);
-    mav(1,lVelo);
-    msleep(750);
-    freeze(0);
-    freeze(1);
-
-
-    set_servo_position(1,100);
-    msleep(500);
-    set_servo_position(1,200);
-    msleep(500);
-    set_servo_position(1,500);
-    msleep(1000);
-    printf("Poms dropped\t");
-
-
-    //Resets the orientation
-    mav(0,-rVelo);
-    mav(1,-lVelo);
-    msleep(750);
-    mav(0,rVelo);
-    mav(1,-lVelo);
-    msleep(turnTime1);
-    printf("Reseted rand\n");
-
-
-}//pomStepsRand
-
-
+//A method for reversing
 void reverse(int reverseTime)
 {
-    //Reverses the bot to get the set and sets the claw to a specific amount
-    mav(0,-rVelo);
-    mav(1,-lVelo);
-    set_servo_position(1,400);
+    mav(RWHEEL,-RVELO);
+    mav(LWHEEL,-LVELO);
     msleep(reverseTime);
-    freeze(0);
-    freeze(1);
-    set_servo_position(0,0);
-    msleep(1000);
+    freeze(RWHEEL);
+    freeze(LWHEEL);
     printf("Reverse done\t");
-}
+}//reverse
 
 
-void pomset2()
+//A method for turning, where 0 is right and 1 is left
+void turning(int time, int direction)
 {
+    if(direction==0)
+    {
+        mav(RWHEEL,-RVELO);
+        mav(LWHEEL,LVELO);
+        msleep(time);
+        freeze(RWHEEL);
+        freeze(LWHEEL);
+        printf("Turning R done \t");
+    } else
+    {
+        mav(RWHEEL,RVELO);
+        mav(LWHEEL,-LVELO);
+        msleep(time);
+        freeze(RWHEEL);
+        freeze(LWHEEL);
+        printf("Turning L done \t");
+    }
    
-}
+}//turning
 
+
+void turningSensor(int delayTime, int direction)
+{
+    int blackTapePassed=0;
+    if(direction==0)
+    {
+        printf("Entered 0\t");
+        mav(RWHEEL,-RVELO/2-300);
+        mav(LWHEEL,LVELO/2+300);
+        while(blackTapePassed==0)
+        {
+            if(analog(BTOPHAT)>BLACKTAPE)
+            {
+                printf("Tape Done\t");
+                msleep(delayTime);
+                blackTapePassed=1;
+                freeze(RWHEEL);
+                freeze(LWHEEL);
+                printf("Turning R done\t");
+            }
+            msleep(5);
+        } //While loop for right
+    } else
+    {
+        printf("Entered 1\t");
+        mav(RWHEEL,RVELO/2+300);
+        mav(LWHEEL,-LVELO/2-300);
+        while(blackTapePassed==0)
+        {
+            if(analog(BTOPHAT)>BLACKTAPE)
+            {
+                printf("Tape Done\t");
+                msleep(delayTime);
+                blackTapePassed=1;
+                freeze(RWHEEL);
+                freeze(LWHEEL);
+                printf("Turning L done\t");
+            }
+            msleep(5);
+        } //While loop for right
+    }
+}//turningSensor
+
+
+//Sets claw to an amount
+void setClaw(int amount)
+{
+    set_servo_position(CLAW,amount);
+    msleep(50);
+    printf("Claw Done\t");
+}//setClaw
+
+
+//Sets pulley to an amount
+void setPulley(int amount)
+{
+    set_servo_position(PULLEY,amount);
+    msleep(50);
+    printf("Pulley Done\t");
+}//setPulley
+
+
+//Sets claw to an amount slowly
+void gradClaw(int amount)
+{
+    int direction=0;
+    int clawPos=get_servo_position(CLAW);
+    int intervals=25;
+    if(clawPos>amount)
+    {
+        direction=0;
+    } else
+    {
+        direction=1;
+    }
+    for(int i=1;i<=intervals;i++)
+    {
+        if(direction==0)
+        {
+            set_servo_position(1,clawPos-((clawPos-amount)/intervals*i));
+            msleep(20);
+        } else
+        {
+            set_servo_position(1,clawPos+((amount-clawPos)/intervals*i));
+            msleep(20);
+        }
+       
+    }
+    printf("Gradual Claw Done\t");
+}//gradClaw
